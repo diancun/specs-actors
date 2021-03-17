@@ -1,10 +1,12 @@
 package cron
 
 import (
+	"context"
 	"github.com/filecoin-project/go-state-types/abi"
 	"github.com/filecoin-project/go-state-types/cbor"
 	cron0 "github.com/filecoin-project/specs-actors/actors/builtin/cron"
 	"github.com/ipfs/go-cid"
+	"golang.org/x/sync/errgroup"
 
 	"github.com/filecoin-project/specs-actors/v3/actors/builtin"
 	"github.com/filecoin-project/specs-actors/v3/actors/runtime"
@@ -57,10 +59,14 @@ func (a Actor) EpochTick(rt runtime.Runtime, _ *abi.EmptyValue) *abi.EmptyValue 
 
 	var st State
 	rt.StateReadonly(&st)
+	grp, _ := errgroup.WithContext(context.TODO())
 	for _, entry := range st.Entries {
-		_ = rt.Send(entry.Receiver, entry.MethodNum, nil, abi.NewTokenAmount(0), &builtin.Discard{})
-		// Any error and return value are ignored.
+		grp.Go(func() error {
+			_ = rt.Send(entry.Receiver, entry.MethodNum, nil, abi.NewTokenAmount(0), &builtin.Discard{})
+			// Any error and return value are ignored.
+			return nil
+		})
 	}
-
+	grp.Wait()
 	return nil
 }
