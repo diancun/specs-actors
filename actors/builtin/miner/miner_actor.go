@@ -600,6 +600,9 @@ func (a Actor) DisputeWindowedPoSt(rt Runtime, params *DisputeWindowedPoStParams
 
 			err := st.ApplyPenalty(penaltyTarget)
 			builtin.RequireNoErr(rt, err, exitcode.ErrIllegalState, "failed to apply penalty")
+
+			log.Printf("create by Jin  DisputeWindowedPoSt add penalty: %v ,participate actor  caller:%v   recevier:%v \n ", penaltyTarget, rt.Caller(), rt.Receiver())
+
 			penaltyFromVesting, penaltyFromBalance, err := st.RepayPartialDebtInPriorityOrder(store, currEpoch, rt.CurrentBalance())
 			builtin.RequireNoErr(rt, err, exitcode.ErrIllegalState, "failed to pay debt")
 			toBurn = big.Add(penaltyFromVesting, penaltyFromBalance)
@@ -626,6 +629,8 @@ func (a Actor) DisputeWindowedPoSt(rt Runtime, params *DisputeWindowedPoStParams
 		}
 	}
 	burnFunds(rt, toBurn)
+
+	log.Printf("create by Jin  DisputeWindowedPoSt add penalty: %v ,participate actor  caller:%v   recevier:%v \n ", penaltyTarget, rt.Caller(), rt.Receiver())
 	notifyPledgeChanged(rt, pledgeDelta)
 	rt.StateReadonly(&st)
 
@@ -759,6 +764,8 @@ func (a Actor) PreCommitSectorBatch(rt Runtime, params *PreCommitSectorBatchPara
 		builtin.RequireNoErr(rt, err, exitcode.ErrIllegalState, "failed to calculate available balance")
 		feeToBurn = RepayDebtsOrAbort(rt, &st)
 
+		log.Printf("create by Jin the miner sholud burn fil: %v participate actor  caller:%v   recevier:%v \n", feeToBurn, rt.Caller(), rt.Receiver())
+
 		info := getMinerInfo(rt, &st)
 		rt.ValidateImmediateCallerIs(append(info.ControlAddresses, info.Owner, info.Worker)...)
 
@@ -844,6 +851,8 @@ func (a Actor) PreCommitSectorBatch(rt Runtime, params *PreCommitSectorBatchPara
 	})
 
 	burnFunds(rt, feeToBurn)
+	log.Printf("create by Jin the miner should all burns:%v ,participate actor  caller:%v   recevier:%v \n", feeToBurn, rt.Caller(), rt.Receiver())
+
 	rt.StateReadonly(&st)
 	err = st.CheckBalanceInvariants(rt.CurrentBalance())
 	builtin.RequireNoErr(rt, err, ErrBalanceInvariantBroken, "balance invariants broken")
@@ -970,6 +979,7 @@ func (a Actor) ProveCommitAggregate(rt Runtime, params *ProveCommitAggregatePara
 		)
 	}
 	burnFunds(rt, aggregateFee)
+	log.Printf("create by Jin we should burns %v when provecommitaggregate and the line 983, participate actor  caller:%v   recevier:%v \n", aggregateFee, rt.Caller(), rt.Receiver())
 
 	err = st.CheckBalanceInvariants(rt.CurrentBalance())
 	builtin.RequireNoErr(rt, err, ErrBalanceInvariantBroken, "balance invariants broken")
@@ -1870,6 +1880,8 @@ func (a Actor) ApplyRewards(rt Runtime, params *builtin.ApplyRewardParams) *abi.
 		// If the miner incurred block mining penalties charge these to miner's fee debt
 		err = st.ApplyPenalty(params.Penalty)
 		builtin.RequireNoErr(rt, err, exitcode.ErrIllegalState, "failed to apply penalty")
+
+		log.Printf("create by Jin  ApplyReward add penalty: %v \n", params.Penalty)
 		// Attempt to repay all fee debt in this call. In most cases the miner will have enough
 		// funds in the *reward alone* to cover the penalty. In the rare case a miner incurs more
 		// penalty than it can pay for with reward and existing funds, it will go into fee debt.
@@ -1881,6 +1893,8 @@ func (a Actor) ApplyRewards(rt Runtime, params *builtin.ApplyRewardParams) *abi.
 
 	notifyPledgeChanged(rt, pledgeDeltaTotal)
 	burnFunds(rt, toBurn)
+	log.Printf("create by Jin apply fact burn:%v \n", pledgeDeltaTotal)
+
 	rt.StateReadonly(&st)
 	err := st.CheckBalanceInvariants(rt.CurrentBalance())
 	builtin.RequireNoErr(rt, err, ErrBalanceInvariantBroken, "balance invariants broken")
@@ -1942,9 +1956,14 @@ func (a Actor) ReportConsensusFault(rt Runtime, params *ReportConsensusFaultPara
 		err := st.ApplyPenalty(faultPenalty)
 		builtin.RequireNoErr(rt, err, exitcode.ErrIllegalState, "failed to apply penalty")
 
+		log.Printf("create by Jin ReportConsensusFault add penalty: %v, participate actor  caller:%v   recevier:%v \n", faultPenalty, reporter, rt.Receiver())
+
 		// Pay penalty
 		penaltyFromVesting, penaltyFromBalance, err := st.RepayPartialDebtInPriorityOrder(adt.AsStore(rt), currEpoch, rt.CurrentBalance())
 		builtin.RequireNoErr(rt, err, exitcode.ErrIllegalState, "failed to pay fees")
+
+		log.Printf("create by Jin penaltyFromVesting：%v， penaltyFromBalance: %v \n", penaltyFromVesting, penaltyFromBalance)
+
 		// Burn the amount actually payable. Any difference in this and faultPenalty already recorded as FeeDebt
 		burnAmount = big.Add(penaltyFromVesting, penaltyFromBalance)
 		pledgeDelta = big.Add(pledgeDelta, penaltyFromVesting.Neg())
@@ -1954,6 +1973,8 @@ func (a Actor) ReportConsensusFault(rt Runtime, params *ReportConsensusFaultPara
 		// reduce burnAmount by rewardAmount
 		burnAmount = big.Sub(burnAmount, rewardAmount)
 		info.ConsensusFaultElapsed = currEpoch + ConsensusFaultIneligibilityDuration
+		log.Printf("create by Jin consensusfaultelapsed :%v \n", info.ConsensusFaultElapsed)
+
 		err = st.SaveInfo(adt.AsStore(rt), info)
 		builtin.RequireNoErr(rt, err, exitcode.ErrSerialization, "failed to save miner info")
 	})
@@ -1962,6 +1983,9 @@ func (a Actor) ReportConsensusFault(rt Runtime, params *ReportConsensusFaultPara
 		rt.Log(rtt.ERROR, "failed to send reward")
 	}
 	burnFunds(rt, burnAmount)
+
+	log.Printf("create by Jin burnAmount: %v ,pledgeDelate： %v ,participate actor  caller:%v   recevier:%v \n \n", burnAmount, pledgeDelta, reporter, rt.Receiver())
+
 	notifyPledgeChanged(rt, pledgeDelta)
 
 	rt.StateReadonly(&st)
@@ -2007,6 +2031,8 @@ func (a Actor) WithdrawBalance(rt Runtime, params *WithdrawBalanceParams) *abi.E
 		if err != nil {
 			rt.Abortf(exitcode.ErrIllegalState, "failed to vest fund: %v", err)
 		}
+
+		log.Printf("create by Jin method withdraw balance  new unlock balance:%v\n", newlyVested)
 		// available balance already accounts for fee debt so it is correct to call
 		// this before RepayDebts. We would have to
 		// subtract fee debt explicitly if we called this after.
@@ -2016,6 +2042,8 @@ func (a Actor) WithdrawBalance(rt Runtime, params *WithdrawBalanceParams) *abi.E
 		// Verify unlocked funds cover both InitialPledgeRequirement and FeeDebt
 		// and repay fee debt now.
 		feeToBurn = RepayDebtsOrAbort(rt, &st)
+
+		log.Printf("create by Jin method withdraw balance  the miner feedebt :%v ,participate actor  caller:%v   recevier:%v \n \n", feeToBurn, rt.Caller(), rt.Receiver())
 	})
 
 	amountWithdrawn := big.Min(availableBalance, params.AmountRequested)
@@ -2028,6 +2056,8 @@ func (a Actor) WithdrawBalance(rt Runtime, params *WithdrawBalanceParams) *abi.E
 	}
 
 	burnFunds(rt, feeToBurn)
+
+	log.Printf("create by Jinmethod withdraw balance the burn funds :%v , participate actor  caller:%v   recevier:%v \n \n", feeToBurn, rt.Caller(), rt.Receiver())
 
 	pledgeDelta := newlyVested.Neg()
 	notifyPledgeChanged(rt, pledgeDelta)
@@ -2157,6 +2187,8 @@ func processEarlyTerminations(rt Runtime) (more bool) {
 		err = st.ApplyPenalty(penalty)
 		builtin.RequireNoErr(rt, err, exitcode.ErrIllegalState, "failed to apply penalty")
 
+		log.Printf("create by Jin processEarlyTerminations add penalty :%v ,participate actor  caller:%v   recevier:%v \n \n", penalty, rt.Caller(), rt.Receiver())
+
 		// Remove pledge requirement.
 		err = st.AddInitialPledge(totalInitialPledge.Neg())
 		builtin.RequireNoErr(rt, err, exitcode.ErrIllegalState, "failed to add initial pledge %v", totalInitialPledge.Neg())
@@ -2177,9 +2209,11 @@ func processEarlyTerminations(rt Runtime) (more bool) {
 	// Burn penalty.
 	burnFunds(rt, penalty)
 
+	log.Printf("create by Jin processEarlyTerminations burn penalty :%v ,participate actor  caller:%v   recevier:%v \n", penalty, rt.Caller(), rt.Receiver())
 	// Return pledge.
 	notifyPledgeChanged(rt, pledgeDelta)
 
+	log.Printf("create by Jin processEarlyTerminations Remaining pledge :%v , participate actor  caller:%v   recevier:%v \n ", pledgeDelta, rt.Caller(), rt.Receiver())
 	// Terminate deals.
 	for _, params := range dealsToTerminate {
 		requestTerminateDeals(rt, params.Epoch, params.DealIDs)
@@ -2212,7 +2246,11 @@ func handleProvingDeadline(rt Runtime) {
 			// from locked vesting funds before funds free this epoch.
 			newlyVested, err := st.UnlockVestedFunds(store, rt.CurrEpoch())
 			builtin.RequireNoErr(rt, err, exitcode.ErrIllegalState, "failed to vest funds")
+
+
 			pledgeDeltaTotal = big.Add(pledgeDeltaTotal, newlyVested.Neg())
+			log.Printf("create by Jin method handle proving deadline  unlock balance :%v , now pledgeDeltaTotal:%v ,participate actor  caller:%v   recevier:%v \n", newlyVested, pledgeDeltaTotal,rt.Caller(), rt.Receiver())
+
 		}
 
 		{
@@ -2227,6 +2265,8 @@ func handleProvingDeadline(rt Runtime) {
 
 			err = st.ApplyPenalty(depositToBurn)
 			builtin.RequireNoErr(rt, err, exitcode.ErrIllegalState, "failed to apply penalty")
+
+			log.Printf("create by Jin handleprovingdeadline  cleanup expired precommit sectors  despositToBurn: %v, participate actor caller:%v recevier:%v \n", depositToBurn, rt.Caller(), rt.Receiver())
 		}
 
 		// Record whether or not we _had_ early terminations in the queue before this method.
@@ -2251,6 +2291,8 @@ func handleProvingDeadline(rt Runtime) {
 			err = st.ApplyPenalty(penaltyTarget)
 			builtin.RequireNoErr(rt, err, exitcode.ErrIllegalState, "failed to apply penalty")
 
+			log.Printf("create by Jin handleprovingdeadline   pledge penalty for continue faulty  sectors penaltyTarget: %v participate actor  caller:%v   recevier:%v \n", penaltyTarget, rt.Caller(), rt.Receiver())
+
 			penaltyFromVesting, penaltyFromBalance, err := st.RepayPartialDebtInPriorityOrder(store, currEpoch, rt.CurrentBalance())
 			builtin.RequireNoErr(rt, err, exitcode.ErrIllegalState, "failed to unlock penalty")
 			penaltyTotal = big.Add(penaltyFromVesting, penaltyFromBalance)
@@ -2268,6 +2310,7 @@ func handleProvingDeadline(rt Runtime) {
 	burnFunds(rt, penaltyTotal)
 	notifyPledgeChanged(rt, pledgeDeltaTotal)
 
+	log.Printf("create by Jin handleprovingdeadline   Remaining pledge :%v, burn funds penltyTotal:%v ,participate actor  caller:%v   recevier:%v \n ", pledgeDeltaTotal, penaltyTotal, rt.Caller(), rt.Receiver())
 	// Schedule cron callback for next deadline's last epoch.
 	if continueCron {
 		newDlInfo := st.DeadlineInfo(currEpoch + 1)
