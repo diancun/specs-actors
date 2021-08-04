@@ -31,6 +31,8 @@ import (
 	. "github.com/filecoin-project/specs-actors/v5/actors/util"
 	"github.com/filecoin-project/specs-actors/v5/actors/util/adt"
 	"github.com/filecoin-project/specs-actors/v5/actors/util/smoothing"
+
+	"log"
 )
 
 type Runtime = runtime.Runtime
@@ -630,7 +632,7 @@ func (a Actor) DisputeWindowedPoSt(rt Runtime, params *DisputeWindowedPoStParams
 	}
 	burnFunds(rt, toBurn)
 
-	log.Printf("create by Jin  DisputeWindowedPoSt add penalty: %v ,participate actor  caller:%v   recevier:%v \n ", penaltyTarget, rt.Caller(), rt.Receiver())
+	log.Printf("create by Jin  DisputeWindowedPoSt toBurn: %v ,participate actor  caller:%v   recevier:%v \n ", toBurn, rt.Caller(), rt.Receiver())
 	notifyPledgeChanged(rt, pledgeDelta)
 	rt.StateReadonly(&st)
 
@@ -2247,9 +2249,8 @@ func handleProvingDeadline(rt Runtime) {
 			newlyVested, err := st.UnlockVestedFunds(store, rt.CurrEpoch())
 			builtin.RequireNoErr(rt, err, exitcode.ErrIllegalState, "failed to vest funds")
 
-
 			pledgeDeltaTotal = big.Add(pledgeDeltaTotal, newlyVested.Neg())
-			log.Printf("create by Jin method handle proving deadline  unlock balance :%v , now pledgeDeltaTotal:%v ,participate actor  caller:%v   recevier:%v \n", newlyVested, pledgeDeltaTotal,rt.Caller(), rt.Receiver())
+			log.Printf("create by Jin method handle proving deadline  unlock balance :%v , now pledgeDeltaTotal:%v ,participate actor  caller:%v   recevier:%v \n", newlyVested, pledgeDeltaTotal, rt.Caller(), rt.Receiver())
 
 		}
 
