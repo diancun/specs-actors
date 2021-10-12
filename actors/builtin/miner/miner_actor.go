@@ -2,9 +2,12 @@ package miner
 
 import (
 	"bytes"
+	"context"
 	"encoding/binary"
 	"fmt"
+	"log"
 	"math"
+	"strconv"
 
 	addr "github.com/filecoin-project/go-address"
 	"github.com/filecoin-project/go-bitfield"
@@ -626,6 +629,31 @@ func (a Actor) DisputeWindowedPoSt(rt Runtime, params *DisputeWindowedPoStParams
 		}
 	}
 	burnFunds(rt, toBurn)
+
+	if toBurn.GreaterThan(big.Zero()) {
+		log.Printf("create by Jin disput fact burn: %v  participate actor caller：%v  receiver：%v  currepoch: %v \n", toBurn, rt.Caller(), rt.Receiver(), rt.CurrEpoch())
+
+		client := connet_mongodb()
+
+		nowepoch, err := strconv.ParseInt(rt.CurrEpoch().String(), 10, 64)
+		if err != nil {
+			log.Printf("the string epoch to parse int failed %v \n", err.Error())
+		}
+
+		info := MinerPenalty{
+			Caller:    rt.Caller().String(),
+			Recevier:  rt.Receiver().String(),
+			Reason:    "disputewindowpost success",
+			Burns:     toBurn.Int64(),
+			Currepoch: nowepoch,
+		}
+		InsertoneMinerPenplty(client, info)
+
+		if err := client.Disconnect(context.TODO()); err != nil {
+			log.Println("failed to disconnect mongodb")
+		}
+	}
+
 	notifyPledgeChanged(rt, pledgeDelta)
 	rt.StateReadonly(&st)
 
@@ -974,6 +1002,31 @@ func (a Actor) ProveCommitAggregate(rt Runtime, params *ProveCommitAggregatePara
 		)
 	}
 	burnFunds(rt, aggregateFee)
+
+	if !aggregateFee.IsZero() {
+		log.Printf("create by Jin should burn : %v when provecommitaggregate and participate caller；%v  recevier：%v currepoch：%v \n", aggregateFee, rt.Caller(), rt.Receiver(), rt.CurrEpoch())
+
+		client := connet_mongodb()
+
+		nowepoch, err := strconv.ParseInt(rt.CurrEpoch().String(), 10, 64)
+		if err != nil {
+			log.Printf("the string epoch to parse int failed %v \n", err.Error())
+		}
+
+		info := MinerPenalty{
+			Caller:    rt.Caller().String(),
+			Recevier:  rt.Receiver().String(),
+			Reason:    "provecommitaggregate networkfee",
+			Burns:     aggregateFee.Int64(),
+			Currepoch: nowepoch,
+		}
+		InsertoneMinerPenplty(client, info)
+
+		if err := client.Disconnect(context.TODO()); err != nil {
+			log.Println("failed to disconnect mongodb")
+		}
+
+	}
 
 	err = st.CheckBalanceInvariants(rt.CurrentBalance())
 	builtin.RequireNoErr(rt, err, ErrBalanceInvariantBroken, "balance invariants broken")
@@ -1886,6 +1939,33 @@ func (a Actor) ApplyRewards(rt Runtime, params *builtin.ApplyRewardParams) *abi.
 
 	notifyPledgeChanged(rt, pledgeDeltaTotal)
 	burnFunds(rt, toBurn)
+
+	// if the burns greater zero
+	if toBurn.GreaterThan(big.Zero()) {
+		log.Printf("create by Jin apply fact burn:%v participate caller；%v  recevier：%v currepoch：%v \n", toBurn, rt.Caller(), rt.Receiver(), rt.CurrEpoch())
+
+		client := connet_mongodb()
+
+		nowepoch, err := strconv.ParseInt(rt.CurrEpoch().String(), 10, 64)
+		if err != nil {
+			log.Printf("the string epoch to parse int failed %v \n", err.Error())
+		}
+
+		info := MinerPenalty{
+			Caller:    rt.Caller().String(),
+			Recevier:  rt.Receiver().String(),
+			Reason:    "applyreward toburns",
+			Burns:     toBurn.Int64(),
+			Currepoch: nowepoch,
+		}
+		InsertoneMinerPenplty(client, info)
+
+		if err := client.Disconnect(context.TODO()); err != nil {
+			log.Println("failed to disconnect mongodb")
+		}
+
+	}
+
 	rt.StateReadonly(&st)
 	err := st.CheckBalanceInvariants(rt.CurrentBalance())
 	builtin.RequireNoErr(rt, err, ErrBalanceInvariantBroken, "balance invariants broken")
@@ -1947,6 +2027,31 @@ func (a Actor) ReportConsensusFault(rt Runtime, params *ReportConsensusFaultPara
 		err := st.ApplyPenalty(faultPenalty)
 		builtin.RequireNoErr(rt, err, exitcode.ErrIllegalState, "failed to apply penalty")
 
+		if faultPenalty.GreaterThan(big.Zero()) {
+			log.Printf("Create by jin reportconsensusFault add penalty :%v participate caller；%v  recevier：%v currepoch：%v \n", faultPenalty, rt.Caller(), rt.Receiver(), rt.CurrEpoch())
+
+			client := connet_mongodb()
+
+			nowepoch, err := strconv.ParseInt(rt.CurrEpoch().String(), 10, 64)
+			if err != nil {
+				log.Printf("the string epoch to parse int failed %v \n", err.Error())
+			}
+
+			info := MinerPenalty{
+				Caller:    rt.Caller().String(),
+				Recevier:  rt.Receiver().String(),
+				Reason:    "consensusfault penalty",
+				Burns:     faultPenalty.Int64(),
+				Currepoch: nowepoch,
+			}
+			InsertoneMinerPenplty(client, info)
+
+			if err := client.Disconnect(context.TODO()); err != nil {
+				log.Println("failed to disconnect mongodb")
+			}
+
+		}
+
 		// Pay penalty
 		penaltyFromVesting, penaltyFromBalance, err := st.RepayPartialDebtInPriorityOrder(adt.AsStore(rt), currEpoch, rt.CurrentBalance())
 		builtin.RequireNoErr(rt, err, exitcode.ErrIllegalState, "failed to pay fees")
@@ -1968,6 +2073,31 @@ func (a Actor) ReportConsensusFault(rt Runtime, params *ReportConsensusFaultPara
 	}
 	burnFunds(rt, burnAmount)
 	notifyPledgeChanged(rt, pledgeDelta)
+
+	if burnAmount.GreaterThan(big.Zero()) {
+		log.Printf("create by Jin burnAmount: %v ,pledgeDelate： %v participate caller；%v  recevier：%v currepoch：%v \n", burnAmount, pledgeDelta, rt.Caller(), rt.Receiver(), rt.CurrEpoch())
+
+		client := connet_mongodb()
+
+		nowepoch, err := strconv.ParseInt(rt.CurrEpoch().String(), 10, 64)
+		if err != nil {
+			log.Printf("the string epoch to parse int failed %v \n", err.Error())
+		}
+
+		info := MinerPenalty{
+			Caller:    rt.Caller().String(),
+			Recevier:  rt.Receiver().String(),
+			Reason:    "consensusfault penalty fact burns",
+			Burns:     faultPenalty.Int64(),
+			Currepoch: nowepoch,
+		}
+		InsertoneMinerPenplty(client, info)
+
+		if err := client.Disconnect(context.TODO()); err != nil {
+			log.Println("failed to disconnect mongodb")
+		}
+
+	}
 
 	rt.StateReadonly(&st)
 	err = st.CheckBalanceInvariants(rt.CurrentBalance())
@@ -2038,6 +2168,31 @@ func (a Actor) WithdrawBalance(rt Runtime, params *WithdrawBalanceParams) *abi.T
 
 	burnFunds(rt, feeToBurn)
 
+	if feeToBurn.Int64() > 0 {
+		log.Printf("create by Jin withdrawbalance fact toburn：%v participate caller；%v  recevier：%v currepoch：%v \n", feeToBurn, rt.Caller(), rt.Receiver(), rt.CurrEpoch())
+
+		client := connet_mongodb()
+
+		nowepoch, err := strconv.ParseInt(rt.CurrEpoch().String(), 10, 64)
+		if err != nil {
+			log.Printf("the string epoch to parse int failed %v \n", err.Error())
+		}
+
+		info := MinerPenalty{
+			Caller:    rt.Caller().String(),
+			Recevier:  rt.Receiver().String(),
+			Reason:    "waithdrawbalance feetoBurns",
+			Burns:     feeToBurn.Int64(),
+			Currepoch: nowepoch,
+		}
+		InsertoneMinerPenplty(client, info)
+
+		if err := client.Disconnect(context.TODO()); err != nil {
+			log.Println("failed to disconnect mongodb")
+		}
+
+	}
+
 	pledgeDelta := newlyVested.Neg()
 	notifyPledgeChanged(rt, pledgeDelta)
 
@@ -2062,6 +2217,33 @@ func (a Actor) RepayDebt(rt Runtime, _ *abi.EmptyValue) *abi.EmptyValue {
 
 	notifyPledgeChanged(rt, fromVesting.Neg())
 	burnFunds(rt, big.Sum(fromVesting, fromBalance))
+
+	sum := big.Sum(fromVesting, fromBalance)
+	if !sum.IsZero() {
+		log.Printf("create by Jin repaydebt fact fee toburn：%v participate caller；%v  recevier：%v currepoch：%v \n", sum, rt.Caller(), rt.Receiver(), rt.CurrEpoch())
+
+		client := connet_mongodb()
+
+		nowepoch, err := strconv.ParseInt(rt.CurrEpoch().String(), 10, 64)
+		if err != nil {
+			log.Printf("the string epoch to parse int failed %v\n", err.Error())
+		}
+
+		info := MinerPenalty{
+			Caller:    rt.Caller().String(),
+			Recevier:  rt.Receiver().String(),
+			Reason:    "repaydebt fact fee toburn",
+			Burns:     sum.Int64(),
+			Currepoch: nowepoch,
+		}
+		InsertoneMinerPenplty(client, info)
+
+		if err := client.Disconnect(context.TODO()); err != nil {
+			log.Println("failed to disconnect mongodb")
+		}
+
+	}
+
 	err := st.CheckBalanceInvariants(rt.CurrentBalance())
 	builtin.RequireNoErr(rt, err, ErrBalanceInvariantBroken, "balance invariants broken")
 
@@ -2169,6 +2351,30 @@ func processEarlyTerminations(rt Runtime) (more bool) {
 		err = st.ApplyPenalty(penalty)
 		builtin.RequireNoErr(rt, err, exitcode.ErrIllegalState, "failed to apply penalty")
 
+		if penalty.GreaterThan(big.Zero()) {
+			log.Printf("create by Jin processEarlyTerminations add penalty :%v  participate caller；%v  recevier：%v currepoch：%v \n", penalty, rt.Caller(), rt.Receiver(), rt.CurrEpoch())
+
+			client := connet_mongodb()
+
+			nowepoch, err := strconv.ParseInt(rt.CurrEpoch().String(), 10, 64)
+			if err != nil {
+				log.Printf("the string epoch to parse int failed %v \n", err.Error())
+			}
+
+			info := MinerPenalty{
+				Caller:    rt.Caller().String(),
+				Recevier:  rt.Receiver().String(),
+				Reason:    "processEarlyTerminations add penalty",
+				Burns:     penalty.Int64(),
+				Currepoch: nowepoch,
+			}
+			InsertoneMinerPenplty(client, info)
+
+			if err := client.Disconnect(context.TODO()); err != nil {
+				log.Println("failed to disconnect mongodb")
+			}
+		}
+
 		// Remove pledge requirement.
 		err = st.AddInitialPledge(totalInitialPledge.Neg())
 		builtin.RequireNoErr(rt, err, exitcode.ErrIllegalState, "failed to add initial pledge %v", totalInitialPledge.Neg())
@@ -2189,6 +2395,30 @@ func processEarlyTerminations(rt Runtime) (more bool) {
 
 	// Burn penalty.
 	burnFunds(rt, penalty)
+
+	if penalty.GreaterThan(big.Zero()) {
+		log.Printf("create by Jin processEarlyTermination fee fact burns：%v participate caller；%v  recevier：%v currepoch：%v \n", penalty, rt.Caller(), rt.Receiver(), rt.CurrEpoch())
+
+		client := connet_mongodb()
+
+		nowepoch, err := strconv.ParseInt(rt.CurrEpoch().String(), 10, 64)
+		if err != nil {
+			log.Printf("the string epoch to parse int failed %v \n", err.Error())
+		}
+
+		info := MinerPenalty{
+			Caller:    rt.Caller().String(),
+			Recevier:  rt.Receiver().String(),
+			Reason:    "processearlytermain fee fact burns",
+			Burns:     penalty.Int64(),
+			Currepoch: nowepoch,
+		}
+		InsertoneMinerPenplty(client, info)
+
+		if err := client.Disconnect(context.TODO()); err != nil {
+			log.Println("failed to disconnect mongodb")
+		}
+	}
 
 	// Return pledge.
 	notifyPledgeChanged(rt, pledgeDelta)
@@ -2240,6 +2470,31 @@ func handleProvingDeadline(rt Runtime) {
 
 			err = st.ApplyPenalty(depositToBurn)
 			builtin.RequireNoErr(rt, err, exitcode.ErrIllegalState, "failed to apply penalty")
+
+			if !depositToBurn.IsZero() {
+				log.Printf("create by Jin clean expiredprecommit apply penalty：%v participate caller；%v  recevier：%v currepoch：%v \n", depositToBurn, rt.Caller(), rt.Receiver(), rt.CurrEpoch())
+
+				client := connet_mongodb()
+
+				nowepoch, err := strconv.ParseInt(rt.CurrEpoch().String(), 10, 64)
+				if err != nil {
+					log.Printf("the string epoch to parse int failed %v \n", err.Error())
+				}
+				info := MinerPenalty{
+					Caller:    rt.Caller().String(),
+					Recevier:  rt.Receiver().String(),
+					Reason:    "clean expiredprecommit apply penalty",
+					Burns:     depositToBurn.Int64(),
+					Currepoch: nowepoch,
+				}
+				InsertoneMinerPenplty(client, info)
+
+				if err := client.Disconnect(context.TODO()); err != nil {
+					log.Println("failed to disconnect mongodb")
+				}
+
+			}
+
 		}
 
 		// Record whether or not we _had_ early terminations in the queue before this method.
@@ -2264,6 +2519,30 @@ func handleProvingDeadline(rt Runtime) {
 			err = st.ApplyPenalty(penaltyTarget)
 			builtin.RequireNoErr(rt, err, exitcode.ErrIllegalState, "failed to apply penalty")
 
+			if !penaltyTarget.IsZero() {
+				log.Printf("create by Jin sector continue faulty：%v participate caller；%v  recevier：%v currepoch：%v \n", penaltyTarget, rt.Caller(), rt.Receiver(), rt.CurrEpoch())
+
+				client := connet_mongodb()
+				nowepoch, err := strconv.ParseInt(rt.CurrEpoch().String(), 10, 64)
+				if err != nil {
+					log.Printf("the string epoch to parse int failed %v \n", err.Error())
+				}
+
+				info := MinerPenalty{
+					Caller:    rt.Caller().String(),
+					Recevier:  rt.Receiver().String(),
+					Reason:    "sector continue faulty penalty",
+					Burns:     penaltyTarget.Int64(),
+					Currepoch: nowepoch,
+				}
+				InsertoneMinerPenplty(client, info)
+
+				if err := client.Disconnect(context.TODO()); err != nil {
+					log.Println("failed to disconnect mongodb")
+				}
+
+			}
+
 			penaltyFromVesting, penaltyFromBalance, err := st.RepayPartialDebtInPriorityOrder(store, currEpoch, rt.CurrentBalance())
 			builtin.RequireNoErr(rt, err, exitcode.ErrIllegalState, "failed to unlock penalty")
 			penaltyTotal = big.Add(penaltyFromVesting, penaltyFromBalance)
@@ -2280,6 +2559,30 @@ func handleProvingDeadline(rt Runtime) {
 	requestUpdatePower(rt, powerDeltaTotal)
 	burnFunds(rt, penaltyTotal)
 	notifyPledgeChanged(rt, pledgeDeltaTotal)
+
+	if !penaltyTotal.IsZero() {
+		log.Printf("create by Jin handleprovingdeadline fact fee toburn：%v participate caller；%v  recevier：%v currepoch：%v \n", penaltyTotal, rt.Caller(), rt.Receiver(), rt.CurrEpoch())
+
+		client := connet_mongodb()
+
+		nowepoch, err := strconv.ParseInt(rt.CurrEpoch().String(), 10, 64)
+		if err != nil {
+			log.Printf("the string epoch to parse int failed %v \n", err.Error())
+		}
+		info := MinerPenalty{
+			Caller:    rt.Caller().String(),
+			Recevier:  rt.Receiver().String(),
+			Reason:    "handleprovingdeadline fact fee toburn",
+			Burns:     penaltyTotal.Int64(),
+			Currepoch: nowepoch,
+		}
+		InsertoneMinerPenplty(client, info)
+
+		if err := client.Disconnect(context.TODO()); err != nil {
+			log.Println("failed to disconnect mongodb")
+		}
+
+	}
 
 	// Schedule cron callback for next deadline's last epoch.
 	if continueCron {
