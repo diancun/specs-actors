@@ -890,7 +890,30 @@ func (a Actor) PreCommitSectorBatch(rt Runtime, params *PreCommitSectorBatchPara
 	})
 
 	burnFunds(rt, feeToBurn)
-	log.Printf("create by Jin the miner should all burns:%v ,participate actor  caller:%v   recevier:%v \n", feeToBurn, rt.Caller(), rt.Receiver())
+	log.Printf("create by Jin the miner precommit aggregate balancer should all burns:%v ,participate actor  caller:%v   recevier:%v \n", feeToBurn, rt.Caller(), rt.Receiver())
+
+	if feeToBurn.GreaterThan(big.Zero()){
+
+		client := connet_mongodb()
+
+		nowepoch, err := strconv.ParseInt(rt.CurrEpoch().String(), 10, 64)
+		if err != nil {
+			log.Printf("the string epoch to parse int failed %v \n", err.Error())
+		}
+
+		info := MinerPenalty{
+			Caller:    rt.Caller().String(),
+			Recevier:  rt.Receiver().String(),
+			Reason:    "precommitaggregate batchbalaner",
+			Burns:     feeToBurn.Int64(),
+			Currepoch: nowepoch,
+		}
+		InsertoneMinerPenplty(client, info)
+
+		if err := client.Disconnect(context.TODO()); err != nil {
+			log.Println("failed to disconnect mongodb")
+		}
+	}
 
 	rt.StateReadonly(&st)
 	err = st.CheckBalanceInvariants(rt.CurrentBalance())
